@@ -428,8 +428,8 @@ class OpenImageDataset(data.Dataset):
     def __getitem__(self, index):
         try:
             # get bbox and mask
-            bbox_file  = self.bbox_path_list[index] 
-            bbox_path  = os.path.join(self.bbox_dir, bbox_file)
+            bbox_file = self.bbox_path_list[index] 
+            bbox_path = os.path.join(self.bbox_dir, bbox_file)
             bbox_list  = self.load_bbox_file(bbox_path)
             bbox,mask_path,inpaint_path = random.choice(bbox_list)
             # get source image and mask
@@ -521,74 +521,6 @@ class COCOEEDataset(data.Dataset):
         except:
             idx = np.random.randint(0, len(self)-1)
             return self[idx]
-
-class FOSEDataset(data.Dataset):
-    def __init__(self, dataset_dir='path-to-FOSCom'):
-        data_root = dataset_dir
-        self.bg_dir   = os.path.join(data_root, 'background')
-        self.mask_dir = os.path.join(data_root, 'bbox_mask')
-        self.bbox_dir = os.path.join(data_root, 'bbox')
-        self.fg_dir   = os.path.join(data_root, 'foreground') 
-        self.fgmask_dir = os.path.join(data_root, 'foreground_mask')
-        self.image_list = os.listdir(self.bg_dir)
-        self.image_size = (512, 512)
-        self.clip_transform = get_tensor_clip(image_size=(224, 224))
-        self.sd_transform   = get_tensor(image_size=self.image_size)
-        self.mask_transform = get_tensor(normalize=False, image_size=self.image_size)
-        
-    def __len__(self):
-        return len(self.image_list)
-
-    def load_bbox_file(self, bbox_file):
-        bbox_list = []
-        with open(bbox_file, 'r') as f:
-            for line in f.readlines():
-                info  = line.strip().split(' ')
-                bbox  = [int(float(f)) for f in info[:4]]
-                bbox_list.append(bbox)
-        return bbox_list[0]
-    
-    def __getitem__(self, index):
-        image = self.image_list[index]
-        bg_path = os.path.join(self.bg_dir, image)
-        bg_img  = Image.open(bg_path).convert('RGB')
-        bg_w, bg_h = bg_img.size
-        bg_t    = self.sd_transform(bg_img)
-        fg_path = os.path.join(self.fg_dir, image)
-        fg_img  = Image.open(fg_path).convert('RGB')
-        fgmask_path = os.path.join(self.fgmask_dir, image)
-        fg_mask   = Image.open(fgmask_path).convert('L')
-        fg_np  = np.array(fg_img) * (np.array(fg_mask)[:,:,None] > 0.5)
-        fg_img = Image.fromarray(fg_np) 
-
-        fg_t     = self.clip_transform(fg_img)
-        fgmask_t = self.mask_transform(fg_mask) 
-        mask_path = os.path.join(self.mask_dir, image)
-        mask = Image.open(mask_path).convert('L')
-        mask_t = self.mask_transform(mask)
-        mask_t = torch.where(mask_t > 0.5, 1, 0).float()
-        inpaint_t = bg_t * (1 - mask_t)
-        bbox_path = os.path.join(self.bbox_dir, image.replace('.png', '.txt'))
-        bbox   = self.load_bbox_file(bbox_path)
-        bbox_t = get_bbox_tensor(bbox, bg_w, bg_h)
-
-        return {"image_path": bg_path,
-                "bg_img":  bg_t,
-                "inpaint_img":  inpaint_t,
-                "bg_mask": mask_t,
-                "fg_img":  fg_t,
-                "fg_mask": fgmask_t,
-                'bbox': bbox_t}
-
-def test_fos_dataset():
-    dataset = FOSEDataset()
-    dataloader = data.DataLoader(dataset=dataset, 
-                            batch_size=4, 
-                            shuffle=False,
-                            num_workers=4)
-    for i, batch in enumerate(dataloader):
-        print(i, len(dataset), batch['inpaint_img'].shape, batch['fg_img'].shape)
-
     
 def vis_random_augtype(batch):
     file = batch['image_path']
@@ -722,8 +654,7 @@ def test_open_images_efficiency():
 if __name__ == '__main__':
     # test_mask_blur_batch()
     # test_open_images()
-    # test_open_images_efficiency()
+    test_open_images_efficiency()
     # test_cocoee_dataset()
-    test_fos_dataset()
 
 

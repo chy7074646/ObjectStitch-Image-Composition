@@ -171,21 +171,20 @@ class PLMSSampler(object):
         return img, intermediates
 
     @torch.no_grad()
-    def p_sample_plms(self, x, c, t, index, mask=None, repeat_noise=False, use_original_steps=False, quantize_denoised=False,
+    def p_sample_plms(self, x, c, t, index, repeat_noise=False, use_original_steps=False, quantize_denoised=False,
                       temperature=1., noise_dropout=0., score_corrector=None, corrector_kwargs=None,
                       unconditional_guidance_scale=1., unconditional_conditioning=None, old_eps=None, t_next=None,**kwargs):
         b, *_, device = *x.shape, x.device
-        def get_model_output(x_input, bbox, t):
+        def get_model_output(x, t):
             if unconditional_conditioning is None or unconditional_guidance_scale == 1.:
-                e_t = self.model.apply_model(x_input, bbox, t, c)
+                e_t = self.model.apply_model(x, t, c)
             else:
-                x_in = torch.cat([x_input] * 2)
+                x_in = torch.cat([x] * 2)
                 t_in = torch.cat([t] * 2)
-                bbox_in = torch.cat([bbox] * 2)
                 c_in = torch.cat([unconditional_conditioning, c])
-                e_t_uncond, e_t = self.model.apply_model(x_in, bbox_in, t_in, c_in).chunk(2)
+                e_t_uncond, e_t = self.model.apply_model(x_in, t_in, c_in).chunk(2)
                 e_t = e_t_uncond + unconditional_guidance_scale * (e_t - e_t_uncond)
-            
+
             if score_corrector is not None:
                 assert self.model.parameterization == "eps"
                 e_t = score_corrector.modify_score(self.model, e_t, x, t, c, **corrector_kwargs)
@@ -215,27 +214,14 @@ class PLMSSampler(object):
                 noise = torch.nn.functional.dropout(noise, p=noise_dropout)
             x_prev = a_prev.sqrt() * pred_x0 + dir_xt + noise
             return x_prev, pred_x0
-        
-        if 'test_model_kwargs' in kwargs:
-            inputs = kwargs['test_model_kwargs']
-        elif 'rest' in kwargs:
-            inputs = kwargs['rest']
-        else:
-            raise Exception("kwargs must contain either 'test_model_kwargs' or 'rest' key")
-        
-        # x_start    = inputs['latent']
-        bg_latent  = inputs['bg_latent']
-        m = inputs['bg_mask'] if mask is None else mask
-        bbox = inputs['bbox']
-        x_noisy = x
-        x_input = torch.cat([x_noisy, bg_latent, 1-m], dim=1)
-        e_t = get_model_output(x_input, bbox, t) 
-        
+        kwargs=kwargs['test_model_kwargs']
+        x_new=torch.cat([x,kwargs['inpaint_image'],kwargs['inpaint_mask']],dim=1)
+        e_t = get_model_output(x_new, t)
         if len(old_eps) == 0:
             # Pseudo Improved Euler (2nd order)
             x_prev, pred_x0 = get_x_prev_and_pred_x0(e_t, index)
-            x_prev_new = torch.cat([x_prev,bg_latent,1-m],dim=1)
-            e_t_next = get_model_output(x_prev_new, bbox, t_next)
+            x_prev_new=torch.cat([x_prev,kwargs['inpaint_image'],kwargs['inpaint_mask']],dim=1)
+            e_t_next = get_model_output(x_prev_new, t_next)
             e_t_prime = (e_t + e_t_next) / 2
         elif len(old_eps) == 1:
             # 2nd order Pseudo Linear Multistep (Adams-Bashforth)

@@ -70,12 +70,10 @@ model:
 
     cond_stage_config:
       target: ldm.modules.encoders.modules.FrozenCLIPImageEmbedder
-      params:
-        version: openai-clip-vit-large-patch14
 
 data:
   target: ldm.data.datamodule.DataModuleFromConfig
-  dataset_dir: path-to-openimages
+  dataset_dir: &dataset_dir $path-to-open-images$
   params:
       batch_size: 16
       num_workers: 16
@@ -90,7 +88,7 @@ data:
           target: ldm.data.open_images.COCOEEDataset
           params:
               split: test
-              dataset_dir: path-to-cocoee
+              dataset_dir: $path-to-cocoee$
               image_size: 512
       test:
           target: ldm.data.open_images.OpenImageDataset
