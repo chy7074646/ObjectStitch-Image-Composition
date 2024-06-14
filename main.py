@@ -175,7 +175,6 @@ def merge_opt_and_config(opt, config):
         config.model.pretrained_model = os.path.join(proj_dir, config.model.pretrained_model)
     return config
 
-
 class SetupCallback(Callback):
     def __init__(self, resume, now, logdir, codedir, ckptdir, cfgdir, config, lightning_config):
         super().__init__()
@@ -235,7 +234,6 @@ class SetupCallback(Callback):
                     os.rename(self.logdir, dst)
                 except FileNotFoundError:
                     pass
-
 
 class ImageLogger(Callback):
     def __init__(self, batch_frequency, max_images, clamp=True, increase_log_steps=False,
@@ -302,7 +300,6 @@ class ImageLogger(Callback):
             if is_train:
                 pl_module.eval()
             
-            
             with torch.no_grad():
                 images = pl_module.log_images(batch, split=split, **self.log_images_kwargs)
 
@@ -346,7 +343,6 @@ class ImageLogger(Callback):
         if hasattr(pl_module, 'calibrate_grad_norm'):
             if (pl_module.calibrate_grad_norm and batch_idx % 25 == 0) and batch_idx > 0:
                 self.log_gradients(trainer, pl_module, batch_idx=batch_idx)
-
 
 class CUDACallback(Callback):
     # see https://github.com/SeanNaren/minGPT/blob/master/mingpt/callback.py
